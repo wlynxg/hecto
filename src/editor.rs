@@ -7,7 +7,7 @@ pub struct Editor {}
 
 impl Editor {
     pub fn default() -> Self {
-        return Editor {};
+        Editor {}
     }
 
     pub fn run(&self) {
@@ -15,17 +15,15 @@ impl Editor {
         loop {
             match read() {
                 Ok(Key(event)) => {
-                    println!("{:?} \r", event);
+                    println!("{event:?} \r");
 
-                    match event.code {
-                        Char(c) => {
-                            if c == 'q' {
-                                break;
-                            }
+                    if let Char(c) = event.code {
+                        if c == 'q' {
+                            break;
                         }
-                        _ => {}
                     }
                 }
+                Err(err) => { println!("Error: {err}") }
                 _ => {}
             }
         }
