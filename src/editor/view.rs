@@ -1,19 +1,30 @@
 use std::io::Error;
 
+use crate::editor::buffer::Buffer;
 use crate::editor::terminal::{Size, Terminal};
 
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub struct View;
+#[derive(Default)]
+pub struct View {
+    buffer: Buffer,
+}
 
 impl View {
-    pub fn render() -> Result<(), Error> {
+    pub fn render(&self) -> Result<(), Error> {
         let Size { height, .. } = Terminal::size()?;
-        Terminal::clear_line()?;
-        Terminal::print("Hello, World!\r\n")?;
-        for current in 1..height {
+        for current in 0..height {
             Terminal::clear_line()?;
+
+            if let Some(line) = self.buffer.lines.get(current) {
+                Terminal::print(line)?;
+                Terminal::print("\r\n")?;
+                continue;
+            }
+
+            // we allow this since we don't care if our welcome message is put _exactly_ in the middle.
+            // it's allowed to be a bit up or down
             #[allow(clippy::integer_division)]
             if current == height / 3 {
                 Self::draw_welcome_message()?;
