@@ -5,6 +5,7 @@ use location::Location;
 
 use crate::editor::editorcommand::{Direction, EditorCommand};
 use crate::editor::terminal::{Position, Size, Terminal};
+use crate::editor::view::line::Line;
 
 mod buffer;
 mod location;
@@ -35,7 +36,7 @@ impl View {
         // we allow this since we don't care if our welcome message is put _exactly_ in the middle.
         // it's allowed to be a bit too far up or down
         #[allow(clippy::integer_division)]
-            let vertical_center = height / 3;
+        let vertical_center = height / 3;
 
         let top = self.scroll_offset.y;
         for current in 0..height {
@@ -78,27 +79,51 @@ impl View {
         // we allow this since we don't care if our welcome message is put _exactly_ in the middle.
         // it's allowed to be a bit to the left or right.
         #[allow(clippy::integer_division)]
-            let padding = (width.saturating_sub(len).saturating_add(1)) >> 1;
+        let padding = (width.saturating_sub(len).saturating_add(1)) >> 1;
 
         let mut full_message = format!("~{}{}", " ".repeat(padding), welcome_message);
         full_message.truncate(width);
         full_message
     }
 
+    // clippy::arithmetic_side_effects: This function performs arithmetic calculations
+    // after explicitly checking that the target value will be within bounds.
+    #[allow(clippy::arithmetic_side_effects)]
     fn move_text_location(&mut self, direction: &Direction) {
         let Location { mut x, mut y } = self.location;
-        let Size { height, width } = self.size;
+        let Size { height, .. } = self.size;
 
         match direction {
             Direction::Up => y = y.saturating_sub(1),
-            Direction::Down => y = min(height.saturating_sub(1), y.saturating_add(1)),
-            Direction::Left => x = x.saturating_sub(1),
-            Direction::Right => x = min(width.saturating_sub(1), x.saturating_add(1)),
-            Direction::PageUp => y = 0,
-            Direction::PageDown => y = height.saturating_sub(1),
+            Direction::Down => y = y.saturating_add(1),
+            Direction::Left => {
+                if x > 0 {
+                    x -= 1;
+                } else if y > 0 {
+                    y -= 1;
+                    x = self.buffer.lines.get(y).map_or(0, Line::len);
+                }
+            }
+            Direction::Right => {
+                let width = self.buffer.lines.get(y).map_or(0, Line::len);
+                if x < width {
+                    x += 1;
+                } else {
+                    y = y.saturating_add(1);
+                    x = 0;
+                }
+            }
+            Direction::PageUp => y = y.saturating_sub(height).saturating_sub(1),
+            Direction::PageDown => y = height.saturating_add(height).saturating_sub(1),
             Direction::Home => x = 0,
-            Direction::End => x = width.saturating_sub(1),
+            Direction::End => x = self.buffer.lines.get(y).map_or(0, Line::len),
         }
+
+        // snap x to valid position
+        x = self.buffer.lines.get(y).map_or(0, |line| min(line.len(), x));
+        // snap y to valid position
+        y = min(y, self.buffer.lines.len());
+
         self.location = Location { x, y };
         self.scroll_location_into_view();
     }
